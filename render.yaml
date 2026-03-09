@@ -2,6 +2,7 @@ services:
   - type: web
     name: aem-card-generator
     env: python
+    pythonVersion: 3.11.9
     region: singapore   # closest to AEST timezone
     plan: free
     buildCommand: cp ../instagram_definition_card.py . && pip install -r requirements.txt
