@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: aem-card-generator
+    env: python
+    region: singapore   # closest to AEST timezone
+    plan: free
+    buildCommand: cp ../instagram_definition_card.py . && pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: CATBOX_USERHASH
+        sync: false       # set manually in Render dashboard
+    healthCheckPath: /health
+    # Render free tier sleeps after 15min inactivity.
+    # Dify's HTTP node has up to 60s timeout — the first request after sleep
+    # may take ~20s cold-start. Add a keepalive ping via cron-job.org if needed.
