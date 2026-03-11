@@ -251,11 +251,19 @@ def draw_aem_logo(img, draw, font_aem, font_algo):
 
 # ── Main card generator ───────────────────────────────────────────────────────
 
-def generate_card(term, explanation, output_path, day_num=None):
+def generate_card(term, explanation, output_path, day_num=None, date=None, day_name=None):
     """
     Generate Instagram card by overlaying text on template image.
     Template contains: robot, logo, white strip, navy background.
     This function adds: term (bold blue), explanation (white), day badge (blue).
+    
+    Args:
+        term: Crypto term or topic (will be uppercased)
+        explanation: 1-2 sentence definition
+        output_path: Where to save the PNG
+        day_num: Day number (1-7) — displayed as "Day 1", "Day 2", etc.
+        date: Full date string (e.g. "March 11, 2026") — displayed instead of day_num if provided
+        day_name: Day name (e.g. "Wednesday") — can be used for filename hint
     """
     # Load template base image
     template_path = os.path.join(os.path.dirname(__file__), "template_base.png")
@@ -277,11 +285,17 @@ def generate_card(term, explanation, output_path, day_num=None):
     f_algo = load_font(REGULAR_FONTS, 20)
 
     # Day badge (white strip, top-right)
-    if day_num:
+    # Display date if provided, otherwise fall back to day number
+    if date or day_num:
         f_badge = load_font(REGULAR_FONTS, 22)
-        badge   = f"Day {day_num}"
-        bb      = draw.textbbox((0, 0), badge, font=f_badge)
-        draw.text((W - (bb[2] - bb[0]) - 48, 60), badge, fill=BLUE, font=f_badge)
+        # Prefer full date over day number
+        if date:
+            badge = date  # e.g. "March 11, 2026"
+        else:
+            badge = f"Day {day_num}"
+        bb = draw.textbbox((0, 0), badge, font=f_badge)
+        badge_x = max(20, W - (bb[2] - bb[0]) - 28)  # padding from right, min 20px from left
+        draw.text((badge_x, 60), badge, fill=BLUE, font=f_badge)
 
     # Content zone: from just below robot base to just above logo
     content_top    = WHITE_H + 4 * P + 30   # ~281 px

@@ -45,7 +45,8 @@ class CardRequest(BaseModel):
     term: str
     explanation: str
     day_num: int | None = None
-    day_name: str | None = None  # e.g. "mon", "tue" ... used in filename hint
+    date: str | None = None      # e.g. "March 11, 2026"
+    day_name: str | None = None  # e.g. "Wednesday"
 
 
 class CardResponse(BaseModel):
@@ -97,6 +98,8 @@ async def generate(req: CardRequest):
             explanation=req.explanation,
             output_path=output_path,
             day_num=req.day_num,
+            date=req.date,
+            day_name=req.day_name,
         )
         image_url = upload_to_catbox(output_path)
     except Exception as e:
