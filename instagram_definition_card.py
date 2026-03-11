@@ -99,85 +99,76 @@ def rect(draw, x0, y0, x1, y1, fill, outline=None, width=0):
 
 def draw_robot(draw):
     """
-    Pixel-art AEM robot.  Head lives in the white strip; base straddles the
-    white/dark boundary.  All dimensions are multiples of P (=16 px).
-
-    Vertical layout (from top):
-      ant_top  = WHITE_H - 9P  = 185 - 144 = 41
-      head_top = WHITE_H - 5P  = 185 - 80  = 105
-      head_bot = WHITE_H       = 185          ← white/dark boundary
-      base_top = WHITE_H + P   = 201
-      base_bot = WHITE_H + 4P  = 249
+    Pixel-art AEM robot — refined to match template exactly.
+    Head lives in the white strip; base straddles the white/dark boundary.
     """
     cx = W // 2   # 540
-
     head_top = WHITE_H - 5 * P   # 105
-    ant_top  = head_top - 4 * P  # 41
+    ant_top  = head_top - 5 * P  # 25 — antennas higher up
 
-    # ── Antennas ─────────────────────────────────────────────────────────────
-    # Each antenna: shaft (1P wide) + square cap on top
-    ant_shaft_w = P                         # 16 px
-    cap_w       = P + P // 2               # 24 px  (wider cap)
-    cap_h       = P                         # 16 px
+    # ── Antennas — tall & prominent ─────────────────────────────────────────
+    ant_shaft_w = P * 1.5   # 24 px — thicker shaft
+    cap_w       = P * 1.8   # 29 px — wider cap
+    cap_h       = P * 1.2   # 19 px — taller cap
 
     for side in (-1, 1):
         if side == -1:
-            shaft_x0 = cx - 3 * P
+            shaft_x0 = cx - int(3.5 * P)
         else:
-            shaft_x0 = cx + 3 * P - ant_shaft_w
-        shaft_x1 = shaft_x0 + ant_shaft_w
+            shaft_x0 = cx + int(2.5 * P)
+        shaft_x1 = shaft_x0 + int(ant_shaft_w)
 
-        # shaft
-        rect(draw, shaft_x0, ant_top + cap_h, shaft_x1, head_top, TEAL)
-        # cap (slightly wider, square)
-        cap_x0 = shaft_x0 - (cap_w - ant_shaft_w) // 2
-        rect(draw, cap_x0, ant_top, cap_x0 + cap_w, ant_top + cap_h, TEAL)
+        # Shaft
+        rect(draw, shaft_x0, int(ant_top + cap_h), shaft_x1, head_top, TEAL)
+        # Cap — wider square on top
+        cap_x0 = int(shaft_x0 - (cap_w - ant_shaft_w) / 2)
+        rect(draw, cap_x0, int(ant_top), int(cap_x0 + cap_w), int(ant_top + cap_h), TEAL)
 
-    # ── Head ─────────────────────────────────────────────────────────────────
-    hw  = 9 * P      # 144 px wide
-    hx  = cx - hw // 2  # 468
+    # ── Head — clean & simple ──────────────────────────────────────────────
+    hw  = int(9 * P)      # 144 px wide
+    hx  = cx - hw // 2    # 468
 
-    # Outer frame  (dark fill + teal border)
+    # Outer frame
     rect(draw, hx, head_top, hx + hw, WHITE_H, BODY_DARK, outline=TEAL, width=3)
 
-    # Inner screen  (light teal)
-    sp = P - 2   # 14 px padding
+    # Inner screen (light teal)
+    sp = int(P * 1.5)     # ~24 px padding
     rect(draw, hx + sp, head_top + sp, hx + hw - sp, WHITE_H - sp, SCREEN_COL)
 
-    # Pixel eyes — two dark rectangles centered on screen
-    eye_w = P + P // 2   # 24 px
-    eye_h = P + P // 3   # ~21 px
-    eye_y = head_top + sp + P
-    eye_gap = P      # gap from screen edge and between eyes
+    # Eyes — 2 simple dark squares
+    eye_sz = int(P * 1.3)  # ~21 px
+    eye_y  = head_top + int(P * 2)
+    eye_gap = int(P * 0.5)
     # left eye
-    rect(draw, cx - eye_w - eye_gap, eye_y, cx - eye_gap, eye_y + eye_h, EYE_COL)
-    # right eye
-    rect(draw, cx + eye_gap, eye_y, cx + eye_gap + eye_w, eye_y + eye_h, EYE_COL)
+    rect(draw, cx - eye_sz - eye_gap - int(P * 0.5), eye_y, 
+         cx - eye_gap, eye_y + eye_sz, EYE_COL)
+    # right eye  
+    rect(draw, cx + eye_gap, eye_y, 
+         cx + eye_gap + eye_sz + int(P * 0.5), eye_y + eye_sz, EYE_COL)
 
-    # Mouth — short dark bar near bottom of screen
-    m_y = WHITE_H - sp - P
-    rect(draw, cx - P - P // 2, m_y, cx + P + P // 2, m_y + P // 3, EYE_COL)
+    # Mouth — simple short bar
+    m_y = WHITE_H - sp - int(P * 2)
+    rect(draw, cx - int(P * 1.2), m_y, cx + int(P * 1.2), m_y + int(P // 2), EYE_COL)
 
-    # ── Base / body ───────────────────────────────────────────────────────────
-    bw = 11 * P   # 176 px  (wider than head)
-    bh = 3 * P    # 48 px
-    bx = cx - bw // 2   # 452
-    by = WHITE_H + P     # 201
+    # ── Base / body pedestal ────────────────────────────────────────────────
+    bw = int(11 * P)   # 176 px
+    bh = int(3.5 * P)  # 56 px
+    bx = cx - bw // 2
+    by = WHITE_H + P
 
     rect(draw, bx, by, bx + bw, by + bh, BODY_DARK, outline=TEAL, width=3)
 
-    # Small teal display panel centred on base
-    pw = 3 * P    # 48 px
-    ph = P + P // 3
+    # Control panel — small teal rectangle centered
+    pw = int(3 * P)
+    ph = int(P * 1.2)
     px0 = cx - pw // 2
-    py0 = by + P // 2
+    py0 = by + int(P * 0.8)
     rect(draw, px0, py0, px0 + pw, py0 + ph, TEAL)
 
 
 # ── AEM logo ──────────────────────────────────────────────────────────────────
 
-# Path to the real AEM logo PNG (aem_logo.png should be in same directory)
-LOGO_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aem_logo.png")
+# Logo is drawn programmatically (not from file)
 
 
 def _draw_network_icon_hires(scale=4):
@@ -226,22 +217,11 @@ def _draw_network_icon_hires(scale=4):
 def draw_aem_logo(img, draw, font_aem, font_algo):
     """
     Paste the AEM Algorithm logo at bottom centre.
-    Uses aem_logo.png if present (pixel-perfect), otherwise draws via code.
+    Draws network icon + text (fallback — most reliable for matching template).
     """
     logo_y  = H - 115
 
-    if os.path.exists(LOGO_FILE):
-        # ── Use real logo file ────────────────────────────────────────────────
-        logo_img = Image.open(LOGO_FILE).convert("RGBA")
-        # Scale logo to fit within 220px wide × 80px tall keeping aspect ratio
-        logo_img.thumbnail((220, 80), Image.Resampling.LANCZOS)
-        lw, lh = logo_img.size
-        lx = (W - lw) // 2
-        ly = logo_y + (80 - lh) // 2
-        img.paste(logo_img, (lx, ly), logo_img)
-        return
-
-    # ── Drawn fallback (supersampled for smoothness) ──────────────────────────
+    # ── Drawn logo (supersampled for smoothness) ──────────────────────────────
     aem_bb  = draw.textbbox((0, 0), "aem",       font=font_aem)
     algo_bb = draw.textbbox((0, 0), "ALGORITHM", font=font_algo)
     aem_w   = aem_bb[2] - aem_bb[0]
@@ -272,15 +252,23 @@ def draw_aem_logo(img, draw, font_aem, font_algo):
 # ── Main card generator ───────────────────────────────────────────────────────
 
 def generate_card(term, explanation, output_path, day_num=None):
-    """Generate a branded 1080×1080 AEM Algorithm card."""
-    img  = Image.new("RGB", (W, H), NAVY)
-    draw = ImageDraw.Draw(img)
-
-    # White top strip
-    draw.rectangle([(0, 0), (W, WHITE_H)], fill=WHITE)
-
-    # Pixel robot (head in white strip, base in dark navy)
-    draw_robot(draw)
+    """
+    Generate Instagram card by overlaying text on template image.
+    Template contains: robot, logo, white strip, navy background.
+    This function adds: term (bold blue), explanation (white), day badge (blue).
+    """
+    # Load template base image
+    template_path = os.path.join(os.path.dirname(__file__), "template_base.png")
+    if not os.path.exists(template_path):
+        # Fallback: generate from scratch (old method)
+        print(f"⚠ Template not found at {template_path}, falling back to code generation")
+        img = Image.new("RGB", (W, H), NAVY)
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([(0, 0), (W, WHITE_H)], fill=WHITE)
+        draw_robot(draw)
+    else:
+        img = Image.open(template_path).convert("RGB")
+        draw = ImageDraw.Draw(img)
 
     # Fonts
     f_term = load_font(BOLD_FONTS,    58)
@@ -320,9 +308,6 @@ def generate_card(term, explanation, output_path, day_num=None):
 
     # Explanation (white)
     draw_block(draw, expl_lines, f_body, TEXT_WHITE, sep_y + 32, 1.5)
-
-    # AEM logo bottom centre
-    draw_aem_logo(img, draw, f_aem, f_algo)
 
     img.save(output_path, "PNG")
     return output_path
