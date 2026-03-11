@@ -14,3 +14,4 @@ services:
     # Render free tier sleeps after 15min inactivity.
     # Dify's HTTP node has up to 60s timeout — the first request after sleep
     # may take ~20s cold-start. Add a keepalive ping via cron-job.org if needed.
+    # may take ~20s cold-start. Add a keepalive ping via cron-job.org if needed.
