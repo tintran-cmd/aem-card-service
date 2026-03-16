@@ -153,11 +153,20 @@ def _oauth() -> OAuth1:
     return OAuth1(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 
 def _upload_media_from_url(image_url: str) -> str:
-    try:
-        download_resp = requests.get(image_url, timeout=30)
-        download_resp.raise_for_status()
-    except Exception as exc:
-        raise RuntimeError(f"Failed to download image_url: {exc}")
+    import time
+    headers = {"User-Agent": "AEM-Bot/1.0 (https://aem-algorithm.com)"}
+    last_exc = None
+    download_resp = None
+    for attempt in range(3):
+        try:
+            download_resp = requests.get(image_url, timeout=30, headers=headers)
+            download_resp.raise_for_status()
+            break
+        except Exception as exc:
+            last_exc = exc
+            time.sleep(2 * (attempt + 1))
+    if download_resp is None or download_resp.status_code != 200:
+        raise RuntimeError(f"Failed to download image_url after 3 retries: {last_exc}")
 
     try:
         upload_resp = requests.post(
