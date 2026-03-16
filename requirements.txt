@@ -1,5 +1,6 @@
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
-pydantic>=2.10.0  # Nâng cấp từ 2.9.0 để tìm bản hỗ trợ Python mới
-requests==2.32.3
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.2
+requests>=2.32.3
+requests-oauthlib>=2.0.0
 Pillow>=11.0.0
