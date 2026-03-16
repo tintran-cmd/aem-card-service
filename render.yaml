@@ -2,16 +2,21 @@ services:
   - type: web
     name: aem-card-generator
     env: python
-    pythonVersion: 3.12.3
-    region: singapore   # closest to AEST timezone
+    region: singapore
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app:app --host 0.0.0.0 --port 8000
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
       - key: CATBOX_USERHASH
-        sync: false       # set manually in Render dashboard
+        sync: false
+      - key: TWITTER_API_KEY
+        sync: false
+      - key: TWITTER_API_SECRET
+        sync: false
+      - key: TWITTER_ACCESS_TOKEN
+        sync: false
+      - key: TWITTER_ACCESS_TOKEN_SECRET
+        sync: false
     healthCheckPath: /health
-    # Render free tier sleeps after 15min inactivity.
-    # Dify's HTTP node has up to 60s timeout — the first request after sleep
-    # may take ~20s cold-start. Add a keepalive ping via cron-job.org if needed.
-    # may take ~20s cold-start. Add a keepalive ping via cron-job.org if needed.
