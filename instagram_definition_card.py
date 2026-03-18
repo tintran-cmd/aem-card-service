@@ -251,7 +251,7 @@ def draw_aem_logo(img, draw, font_aem, font_algo):
 
 # ── Main card generator ───────────────────────────────────────────────────────
 
-def generate_card(term, explanation, output_path, day_num=None, date=None, day_name=None):
+def generate_card(term, explanation, output_path):
     """
     Generate Instagram card by overlaying text on template image.
     Template contains: robot, logo, white strip, navy background.
@@ -261,9 +261,6 @@ def generate_card(term, explanation, output_path, day_num=None, date=None, day_n
         term: Crypto term or topic (will be uppercased)
         explanation: 1-2 sentence definition
         output_path: Where to save the PNG
-        day_num: Day number (1-7) — displayed as "Day 1", "Day 2", etc.
-        date: Full date string (e.g. "March 11, 2026") — displayed instead of day_num if provided
-        day_name: Day name (e.g. "Wednesday") — can be used for filename hint
     """
     # Load template base image
     template_path = os.path.join(os.path.dirname(__file__), "template_base.png")
@@ -284,18 +281,7 @@ def generate_card(term, explanation, output_path, day_num=None, date=None, day_n
     f_aem  = load_font(BOLD_FONTS,    40)
     f_algo = load_font(REGULAR_FONTS, 20)
 
-    # Day badge (white strip, top-right)
-    # Display date if provided, otherwise fall back to day number
-    if date or day_num:
-        f_badge = load_font(REGULAR_FONTS, 22)
-        # Prefer full date over day number
-        if date:
-            badge = date  # e.g. "March 11, 2026"
-        else:
-            badge = f"Day {day_num}"
-        bb = draw.textbbox((0, 0), badge, font=f_badge)
-        badge_x = max(20, W - (bb[2] - bb[0]) - 28)  # padding from right, min 20px from left
-        draw.text((badge_x, 60), badge, fill=BLUE, font=f_badge)
+    # Day badge (white strip, top-right) - REMOVED per user request
 
     # Content zone: from just below robot base to just above logo
     content_top    = WHITE_H + 4 * P + 30   # ~281 px
@@ -341,7 +327,6 @@ def generate_from_json(json_path, output_dir):
             term=post["term"],
             explanation=post["card_text"],
             output_path=output_path,
-            day_num=i + 1,
         )
         print(f"  Generated: {output_path}")
 
@@ -351,7 +336,6 @@ if __name__ == "__main__":
     parser.add_argument("--term", help="Crypto term to define")
     parser.add_argument("--explanation", help="Short explanation/analogy")
     parser.add_argument("--output", help="Output PNG path", default="card.png")
-    parser.add_argument("--day", type=int, help="Day number badge")
     parser.add_argument("--json", help="Batch mode: path to posts.json")
     parser.add_argument("--output-dir", help="Batch mode: output directory", default="./cards/")
     args = parser.parse_args()
@@ -359,7 +343,7 @@ if __name__ == "__main__":
     if args.json:
         generate_from_json(args.json, args.output_dir)
     elif args.term and args.explanation:
-        generate_card(args.term, args.explanation, args.output, day_num=args.day)
+        generate_card(args.term, args.explanation, args.output)
         print(f"Generated: {args.output}")
     else:
         parser.print_help()

@@ -123,9 +123,6 @@ async def generate(req: CardRequest):
             term=req.term,
             explanation=req.explanation,
             output_path=output_path,
-            day_num=req.day_num,
-            date=req.date,
-            day_name=req.day_name,
         )
         image_url = upload_to_catbox(output_path)
     except Exception as e:
