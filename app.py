@@ -203,7 +203,7 @@ def _create_tweet(text: str, media_id: Optional[str] = None) -> dict:
 async def tweet(req: TweetRequest):
     text = req.text.strip()
     if len(text) > 280:
-        raise HTTPException(status_code=400, detail="text must be <= 280 characters")
+        return TweetResponse(success=False, error="text must be <= 280 characters")
 
     try:
         media_id = _upload_media_from_url(req.image_url) if req.image_url else None
