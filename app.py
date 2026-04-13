@@ -16,7 +16,9 @@ from typing import Optional
 
 import requests
 import uvicorn
+import uuid
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from requests_oauthlib import OAuth1
 
@@ -55,6 +57,10 @@ app = FastAPI(
     description="Card Generator & Twitter Post service combined to save Render free tier.",
     version="1.1.0",
 )
+
+IMG_DIR = Path(__file__).parent / "images"
+IMG_DIR.mkdir(exist_ok=True)
+app.mount("/images", StaticFiles(directory=str(IMG_DIR)), name="images")
 
 # --- Models ---
 class CardRequest(BaseModel):
@@ -127,14 +133,14 @@ def upload_to_catbox(file_path: str) -> str:
 @app.post("/generate", response_model=CardResponse)
 async def generate(req: CardRequest):
     """
-    Generate a branded card image and upload it to catbox.moe.
+    Generate a branded card image. Host it directly on Render's ephemeral disk.
     Returns the public URL to use with Instagram Graph API / Telegram / Twitter.
     """
     if not req.term or not req.explanation:
         raise HTTPException(status_code=400, detail="term and explanation are required")
 
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-        output_path = tmp.name
+    filename = f"card_{uuid.uuid4().hex[:10]}.png"
+    output_path = str(IMG_DIR / filename)
 
     try:
         generate_card(
@@ -142,8 +148,16 @@ async def generate(req: CardRequest):
             explanation=req.explanation,
             output_path=output_path,
         )
-        image_url = upload_to_catbox(output_path)
+        # Upload it to our own Cloudflare Relay which has permanent KV storage
+        import requests
+        cf_url = os.getenv("RELAY_URL", "https://aem-telegram-relay.tin-tran-84f.workers.dev")
+        with open(output_path, "rb") as f:
+            resp = requests.post(f"{cf_url}/images/upload", files={"file": f}, timeout=30)
+            resp.raise_for_status()
+            image_url = resp.json().get("url")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         try:
