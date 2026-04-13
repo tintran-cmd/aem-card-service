@@ -107,20 +107,22 @@ def upload_to_catbox(file_path: str) -> str:
         if url.startswith("http"):
             return url
     except Exception as e:
-        print(f"Catbox failed: {e}. Falling back to uguu.se...")
+        print(f"Catbox failed: {e}. Falling back to tmpfiles.org...")
 
-    # Fallback to uguu.se (allows anonymous ephemeral upload for 24 hours)
+    # Fallback to tmpfiles.org (ephemeral upload)
     try:
         with open(file_path, "rb") as f:
             resp = requests.post(
-                "https://uguu.se/api.php?d=upload-tool",
+                "https://tmpfiles.org/api/v1/upload",
                 files={"file": f},
                 timeout=30,
             )
         resp.raise_for_status()
-        return resp.json()["files"][0]["url"]
+        url = resp.json()["data"]["url"]
+        # Convert to direct download link
+        return url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
     except Exception as e:
-        raise RuntimeError(f"Both catbox and uguu.se failed: {e}")
+        raise RuntimeError(f"Both catbox and tmpfiles failed: {e}")
 
 @app.post("/generate", response_model=CardResponse)
 async def generate(req: CardRequest):
