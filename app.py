@@ -89,22 +89,38 @@ async def health():
 
 # --- 1) CARD GENERATION PIPELINE ---
 def upload_to_catbox(file_path: str) -> str:
-    """Upload a file to catbox.moe and return the public URL."""
-    with open(file_path, "rb") as f:
-        payload = {"reqtype": "fileupload"}
-        if CATBOX_USERHASH:
-            payload["userhash"] = CATBOX_USERHASH
-        resp = requests.post(
-            CATBOX_URL,
-            files={"fileToUpload": f},
-            data=payload,
-            timeout=30,
-        )
-    resp.raise_for_status()
-    url = resp.text.strip()
-    if not url.startswith("http"):
-        raise RuntimeError(f"catbox.moe upload failed: {url}")
-    return url
+    """Upload a file to catbox.moe and return the public URL. Fallbacks to uguu.se if blocked."""
+    catbox_hash = CATBOX_USERHASH.strip()
+    try:
+        with open(file_path, "rb") as f:
+            payload = {"reqtype": "fileupload"}
+            if catbox_hash:
+                payload["userhash"] = catbox_hash
+            resp = requests.post(
+                CATBOX_URL,
+                files={"fileToUpload": f},
+                data=payload,
+                timeout=30,
+            )
+        resp.raise_for_status()
+        url = resp.text.strip()
+        if url.startswith("http"):
+            return url
+    except Exception as e:
+        print(f"Catbox failed: {e}. Falling back to uguu.se...")
+
+    # Fallback to uguu.se (allows anonymous ephemeral upload for 24 hours)
+    try:
+        with open(file_path, "rb") as f:
+            resp = requests.post(
+                "https://uguu.se/api.php?d=upload-tool",
+                files={"file": f},
+                timeout=30,
+            )
+        resp.raise_for_status()
+        return resp.json()["files"][0]["url"]
+    except Exception as e:
+        raise RuntimeError(f"Both catbox and uguu.se failed: {e}")
 
 @app.post("/generate", response_model=CardResponse)
 async def generate(req: CardRequest):
