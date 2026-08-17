@@ -259,7 +259,7 @@ def generate_card(term, explanation, output_path):
     
     Args:
         term: Crypto term or topic (will be uppercased)
-        explanation: 1-2 sentence definition
+        explanation: Definition text OR bullet-point format (e.g., "• BTC: $65K surge\n• ETH: Gas drops")
         output_path: Where to save the PNG
     """
     # Load template base image
@@ -281,18 +281,35 @@ def generate_card(term, explanation, output_path):
     f_aem  = load_font(BOLD_FONTS,    40)
     f_algo = load_font(REGULAR_FONTS, 20)
 
-    # Day badge (white strip, top-right) - REMOVED per user request
-
     # Content zone: from just below robot base to just above logo
     content_top    = WHITE_H + 4 * P + 30   # ~281 px
     content_bottom = H - 120                # ~960 px
     max_w = W - 200
 
     term_lines = wrap_text(term.upper(), f_term, max_w, draw)
-    expl_lines = wrap_text(explanation,  f_body, max_w, draw)
-
     th = block_height(term_lines, f_term, draw, 1.3)
-    eh = block_height(expl_lines, f_body, draw, 1.5)
+
+    # Check if explanation is in bullet format (contains "•" or "- " at start of lines)
+    is_bullet_format = "•" in explanation or explanation.strip().startswith("- ")
+    
+    if is_bullet_format:
+        # Bullet format: render each bullet line with slightly smaller font
+        f_bullet = load_font(REGULAR_FONTS, 28)
+        # Split by newlines and filter empty lines
+        bullet_lines = [line.strip() for line in explanation.split("\n") if line.strip()]
+        # Wrap each bullet line
+        wrapped_lines = []
+        for line in bullet_lines:
+            wrapped_lines.extend(wrap_text(line, f_bullet, max_w, draw))
+        bullet_text = "\n".join(wrapped_lines)
+        expl_lines = bullet_text.split("\n")
+        eh = block_height(expl_lines, f_bullet, draw, 1.4)
+    else:
+        # Regular paragraph format
+        f_bullet = f_body
+        expl_lines = wrap_text(explanation, f_body, max_w, draw)
+        eh = block_height(expl_lines, f_body, draw, 1.5)
+
     total = th + 55 + eh
 
     start_y = content_top + (content_bottom - content_top - total) // 2
@@ -306,8 +323,8 @@ def generate_card(term, explanation, output_path):
     draw.line([((W - sep_w) // 2, sep_y), ((W + sep_w) // 2, sep_y)],
               fill=BLUE, width=2)
 
-    # Explanation (white)
-    draw_block(draw, expl_lines, f_body, TEXT_WHITE, sep_y + 32, 1.5)
+    # Explanation (white) - use smaller font for bullet format
+    draw_block(draw, expl_lines, f_bullet, TEXT_WHITE, sep_y + 32, 1.4)
 
     img.save(output_path, "PNG")
     return output_path
