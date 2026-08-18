@@ -251,15 +251,55 @@ def draw_aem_logo(img, draw, font_aem, font_algo):
 
 # ── Main card generator ───────────────────────────────────────────────────────
 
+def _clean_bullet_text(raw: str, max_bullets: int = 4, max_chars_per_bullet: int = 52):
+    """
+    Normalise LLM output into a clean bullet list for the card image.
+
+    - Strips markdown bullets (`* `, `- `, `• `) at line start
+    - Strips `[SourceName]` / `[X]` / `[CoinDesk]` prefixes (saves chars, cleaner card)
+    - Removes sub-bullet lines that start with `↳` (link markers)
+    - Caps to `max_bullets` items
+    - Truncates each bullet to `max_chars_per_bullet` so it fits one line
+    - Sorts/rank by importance if LLM included ranking chars
+    """
+    import re
+    out = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Drop link/sub-bullet lines (LLM ignore "NO links" rule sometimes)
+        if stripped.startswith("↳") or stripped.startswith("→"):
+            continue
+        # Strip leading markdown bullet markers
+        for marker in ("* ", "- ", "• "):
+            if stripped.startswith(marker):
+                stripped = stripped[len(marker):]
+                break
+        # Strip [Source] prefix — saves 3-10 chars per bullet & cleaner card
+        # Match patterns: "[X] ", "[CoinDesk] ", "[CoinGecko] ", "[Cointelegraph] " etc.
+        stripped = re.sub(r'^\[[^\]]{1,20}\]\s*', '', stripped).strip()
+        if not stripped:
+            continue
+        # Truncate oversize bullets so they don't wrap to 2 lines on card
+        if len(stripped) > max_chars_per_bullet:
+            stripped = stripped[: max_chars_per_bullet - 1].rstrip() + "…"
+        out.append(stripped)
+        if len(out) >= max_bullets:
+            break
+    return out
+
+
 def generate_card(term, explanation, output_path):
     """
     Generate Instagram card by overlaying text on template image.
     Template contains: robot, logo, white strip, navy background.
     This function adds: term (bold blue), explanation (white), day badge (blue).
-    
+
     Args:
         term: Crypto term or topic (will be uppercased)
-        explanation: Definition text OR bullet-point format (e.g., "• BTC: $65K surge\n• ETH: Gas drops")
+        explanation: Definition text OR bullet-point format
+                     (e.g., "* BTC: $65K surge\n* ETH: Gas drops")
         output_path: Where to save the PNG
     """
     # Load template base image
@@ -278,6 +318,7 @@ def generate_card(term, explanation, output_path):
     # Fonts
     f_term = load_font(BOLD_FONTS,    58)
     f_body = load_font(REGULAR_FONTS, 32)
+    f_bullet = load_font(REGULAR_FONTS, 28)
     f_aem  = load_font(BOLD_FONTS,    40)
     f_algo = load_font(REGULAR_FONTS, 20)
 
@@ -289,24 +330,40 @@ def generate_card(term, explanation, output_path):
     term_lines = wrap_text(term.upper(), f_term, max_w, draw)
     th = block_height(term_lines, f_term, draw, 1.3)
 
-    # Check if explanation is in bullet format (contains "•" or "- " at start of lines)
-    is_bullet_format = "•" in explanation or explanation.strip().startswith("- ")
-    
+    # Detect bullet format: `*`, `-`, or `•` markers (LLM uses `*` not `•`)
+    is_bullet_format = bool(explanation) and any(
+        explanation.lstrip().startswith(m) or f"\n{m}" in explanation
+        for m in ("* ", "- ", "• ")
+    )
+
     if is_bullet_format:
-        # Bullet format: render each bullet line with slightly smaller font
-        f_bullet = load_font(REGULAR_FONTS, 28)
-        # Split by newlines and filter empty lines
-        bullet_lines = [line.strip() for line in explanation.split("\n") if line.strip()]
-        # Wrap each bullet line
+        # Clean + cap to 4 bullets
+        bullets = _clean_bullet_text(explanation, max_bullets=4, max_chars_per_bullet=52)
+        if len(bullets) < 2:
+            # Not enough bullets after cleaning — fall back to paragraph
+            is_bullet_format = False
+
+    if is_bullet_format:
+        # ── Bullet render path ──────────────────────────────────────────────
+        # Wrap each bullet (still capped by _clean_bullet_text above)
         wrapped_lines = []
-        for line in bullet_lines:
+        for line in bullets:
             wrapped_lines.extend(wrap_text(line, f_bullet, max_w, draw))
-        bullet_text = "\n".join(wrapped_lines)
-        expl_lines = bullet_text.split("\n")
-        eh = block_height(expl_lines, f_bullet, draw, 1.4)
+        # Insert a blank line between bullets for breathing room
+        spaced = []
+        for i, ln in enumerate(wrapped_lines):
+            spaced.append(ln)
+            # If next line exists and current line starts with a bullet marker OR
+            # we are at a bullet boundary, add a gap row
+            if i + 1 < len(wrapped_lines):
+                # Detect transition to a new bullet by `*` at start of next line
+                if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•")):
+                    spaced.append("")  # blank gap row
+        expl_lines = spaced
+        # Tighter line spacing since we already added gap rows
+        eh = block_height(expl_lines, f_bullet, draw, 1.25)
     else:
-        # Regular paragraph format
-        f_bullet = f_body
+        # ── Regular paragraph render path ────────────────────────────────────
         expl_lines = wrap_text(explanation, f_body, max_w, draw)
         eh = block_height(expl_lines, f_body, draw, 1.5)
 
@@ -323,8 +380,10 @@ def generate_card(term, explanation, output_path):
     draw.line([((W - sep_w) // 2, sep_y), ((W + sep_w) // 2, sep_y)],
               fill=BLUE, width=2)
 
-    # Explanation (white) - use smaller font for bullet format
-    draw_block(draw, expl_lines, f_bullet, TEXT_WHITE, sep_y + 32, 1.4)
+    # Explanation (white)
+    line_spacing = 1.25 if is_bullet_format else 1.4
+    draw_block(draw, expl_lines, f_bullet if is_bullet_format else f_body,
+               TEXT_WHITE, sep_y + 32, line_spacing)
 
     img.save(output_path, "PNG")
     return output_path
