@@ -392,13 +392,12 @@ def generate_card(term, explanation, output_path):
     # Fonts
     f_term = load_font(BOLD_FONTS,    58)
     f_body = load_font(REGULAR_FONTS, 32)
-    f_bullet = load_font(REGULAR_FONTS, 28)
     f_aem  = load_font(BOLD_FONTS,    40)
     f_algo = load_font(REGULAR_FONTS, 20)
 
     # Content zone: from just below robot base to just above logo
     content_top    = WHITE_H + 4 * P + 30   # ~281 px
-    content_bottom = H - 120                # ~960 px
+    content_bottom = H - 105                # ~975 px
     max_w = W - 200
 
     term_lines = wrap_text(term.upper(), f_term, max_w, draw)
@@ -412,37 +411,74 @@ def generate_card(term, explanation, output_path):
 
     if is_bullet_format:
         # Clean + cap to 4 bullets
-        bullets = _clean_bullet_text(explanation, max_bullets=4, max_chars_per_bullet=62)
+        bullets = _clean_bullet_text(explanation, max_bullets=4, max_chars_per_bullet=80)
         if len(bullets) < 2:
             # Not enough bullets after cleaning — fall back to paragraph
             is_bullet_format = False
 
-    if is_bullet_format:
-        # ── Bullet render path ──────────────────────────────────────────────
-        # Wrap each bullet (still capped by _clean_bullet_text above)
-        wrapped_lines = []
-        for line in bullets:
-            wrapped_lines.extend(wrap_text(line, f_bullet, max_w, draw))
-        # Insert a blank line between bullets for breathing room
-        spaced = []
-        for i, ln in enumerate(wrapped_lines):
-            spaced.append(ln)
-            # If next line exists and current line starts with a bullet marker OR
-            # we are at a bullet boundary, add a gap row
-            if i + 1 < len(wrapped_lines):
-                # Detect transition to a new bullet by `*` at start of next line
-                if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•")):
-                    spaced.append("")  # blank gap row
-        expl_lines = spaced
-        # Tighter line spacing since we already added gap rows
-        eh = block_height(expl_lines, f_bullet, draw, 1.25)
-    else:
-        # ── Regular paragraph render path ────────────────────────────────────
-        expl_lines = wrap_text(explanation, f_body, max_w, draw)
-        eh = block_height(expl_lines, f_body, draw, 1.5)
+    # Auto-fit: scale font size to make content fit available space
+    # Try decreasing font sizes until everything fits
+    available_h = content_bottom - content_top - th - 55  # space for term + separator
+    best_f_bullet = None
+    best_f_body = None
+    best_expl_lines = None
+    best_eh = None
+    best_size = 0
 
-    total = th + 55 + eh
+    for size in [28, 26, 24, 22, 20, 18, 16]:
+        f_b  = load_font(REGULAR_FONTS, size)
+        f_bd = load_font(BOLD_FONTS,    size)
 
+        if is_bullet_format:
+            # Build wrapped lines for bullets (no indent on wrapped continuation)
+            wrapped_lines = []
+            for line in bullets:
+                wl = wrap_text(line, f_b, max_w, draw)
+                wrapped_lines.extend(wl)
+            # Insert a blank line between bullets
+            spaced = []
+            for i, ln in enumerate(wrapped_lines):
+                spaced.append(ln)
+                if i + 1 < len(wrapped_lines):
+                    if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•", "BTC", "ETH", "SOL", "X", "Coin", "White", "Toyota", "Meta", "Kraken", "Trump", "SEC", "CFTC", "Bitcoin", "Ethereum", "Token", "ETF", "Tether", "US", "Bank", "Gold", "Oil", "Japan", "China", "Europe", "Asia")):
+                        spaced.append("")
+            expl_lines = spaced
+            eh = block_height(expl_lines, f_b, draw, 1.2)
+        else:
+            expl_lines = wrap_text(explanation, f_bd, max_w, draw)
+            eh = block_height(expl_lines, f_bd, draw, 1.4)
+
+        total_h = th + 55 + eh
+        if total_h <= (content_bottom - content_top):
+            best_f_bullet = f_b
+            best_f_body = f_bd
+            best_expl_lines = expl_lines
+            best_eh = eh
+            best_size = size
+            break
+
+    # Fallback: use smallest size even if still doesn't fit (rare case)
+    if best_f_bullet is None:
+        best_size = 14
+        best_f_bullet = load_font(REGULAR_FONTS, 14)
+        best_f_body = load_font(BOLD_FONTS, 14)
+        if is_bullet_format:
+            wrapped_lines = []
+            for line in bullets:
+                wrapped_lines.extend(wrap_text(line, best_f_bullet, max_w, draw))
+            spaced = []
+            for i, ln in enumerate(wrapped_lines):
+                spaced.append(ln)
+                if i + 1 < len(wrapped_lines):
+                    if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•", "BTC", "ETH", "SOL", "X", "Coin", "White", "Toyota", "Meta", "Kraken", "Trump", "SEC", "CFTC", "Bitcoin", "Ethereum", "Token", "ETF", "Tether", "US", "Bank", "Gold", "Oil", "Japan", "China", "Europe", "Asia")):
+                        spaced.append("")
+            best_expl_lines = spaced
+            best_eh = block_height(best_expl_lines, best_f_bullet, draw, 1.2)
+        else:
+            best_expl_lines = wrap_text(explanation, best_f_body, max_w, draw)
+            best_eh = block_height(best_expl_lines, best_f_body, draw, 1.4)
+
+    total = th + 55 + best_eh
     start_y = content_top + (content_bottom - content_top - total) // 2
 
     # Term (bold, BLUE, uppercase)
@@ -454,9 +490,9 @@ def generate_card(term, explanation, output_path):
     draw.line([((W - sep_w) // 2, sep_y), ((W + sep_w) // 2, sep_y)],
               fill=BLUE, width=2)
 
-    # Explanation (white)
-    line_spacing = 1.25 if is_bullet_format else 1.4
-    draw_block(draw, expl_lines, f_bullet if is_bullet_format else f_body,
+    # Explanation (white) — auto-sized font
+    line_spacing = 1.2 if is_bullet_format else 1.4
+    draw_block(draw, best_expl_lines, best_f_bullet if is_bullet_format else best_f_body,
                TEXT_WHITE, sep_y + 32, line_spacing)
 
     img.save(output_path, "PNG")
