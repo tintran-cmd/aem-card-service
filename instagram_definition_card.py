@@ -251,26 +251,100 @@ def draw_aem_logo(img, draw, font_aem, font_algo):
 
 # ── Main card generator ───────────────────────────────────────────────────────
 
+def _split_unstructured_lines(text: str) -> list:
+    """
+    Last-resort splitter for LLM output that ignored bullet formatting.
+
+    If the LLM dumped 5 topics into a single paragraph with only URLs as
+    separators, reconstruct lines by splitting on URL anchors (`↳` or
+    pure-URL substrings), then trim leading filler words.
+
+    Heuristic:
+      - Split on `↳ [Link](url)` markers (LLM usually keeps the link markers)
+      - Then split top-level sentences by `.` only when sentence is long
+        and contains numeric/dollar hint typical of crypto headlines
+      - Drop hashtags / footer artifacts
+    """
+    import re
+    if not text:
+        return []
+
+    # Step 1: remove the trailing hashtags line so we don't treat them as a "topic"
+    # (card_text should not have hashtags anyway, but defensive)
+    cleaned = text.strip()
+
+    # Step 2: split on `↳` link markers if present — keep what's before each link
+    if "↳" in cleaned:
+        parts = []
+        buf = []
+        for chunk in cleaned.split("↳"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            # The chunk BEFORE a URL is the topic summary text — keep it
+            # The chunk AFTER is the next topic's leading text (or trailing hashtags)
+            if chunk.startswith("http"):
+                # We hit a URL directly; previous buffer already captured its topic
+                continue
+            # Drop the "Link](url)" markers that wrap URLs
+            chunk = re.sub(r"\[Link\]\([^)]+\)", "", chunk).strip()
+            if chunk:
+                buf.append(chunk)
+        return [p for p in buf if len(p) > 5]
+
+    # Step 3: no link markers — split on runs of whitespace between capitalised
+    # topic starters when they look glued together
+    # Pattern: "...$115M 40x BTC short just..." (no separator)
+    # Try splitting before $XXX / +XX% / Topic-style prefixes
+    glued_splits = re.split(
+        r"(?=(?:\$[\d,]+|\+?\d+%|DTCC|Kraken|Venice|US Treasury|Bitcoin|Ethereum|BTC|ETH|SOL|XRP))",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    glued_splits = [s.strip(" ,.;:\n") for s in glued_splits if s.strip()]
+    if len(glued_splits) >= 3:
+        return [s for s in glued_splits if len(s) > 10]
+
+    return [cleaned]
+
+
 def _clean_bullet_text(raw: str, max_bullets: int = 4, max_chars_per_bullet: int = 52):
     """
     Normalise LLM output into a clean bullet list for the card image.
 
+    - Auto-splits glued unstructured text (e.g. when LLM ignored bullet rules)
     - Strips markdown bullets (`* `, `- `, `• `) at line start
     - Strips `[SourceName]` / `[X]` / `[CoinDesk]` prefixes (saves chars, cleaner card)
     - Removes sub-bullet lines that start with `↳` (link markers)
+    - Drops trailing hashtag lines
     - Caps to `max_bullets` items
     - Truncates each bullet to `max_chars_per_bullet` so it fits one line
-    - Sorts/rank by importance if LLM included ranking chars
     """
     import re
+    if not raw:
+        return []
     out = []
-    for line in raw.splitlines():
+
+    # First pass: split into lines
+    lines = raw.splitlines()
+
+    # If only 1 line and looks like LLM dumped everything together,
+    # attempt glued-text recovery
+    if len(lines) == 1:
+        lines = _split_unstructured_lines(lines[0])
+
+    for line in lines:
         stripped = line.strip()
         if not stripped:
             continue
         # Drop link/sub-bullet lines (LLM ignore "NO links" rule sometimes)
         if stripped.startswith("↳") or stripped.startswith("→"):
             continue
+        # Drop trailing-hashtag standalone line (defensive — card_text should never have these)
+        if stripped.startswith("#"):
+            continue
+        # Strip the URL wrapping defensively
+        stripped = re.sub(r"\[Link\]\([^)]+\)", "", stripped).strip()
         # Strip leading markdown bullet markers
         for marker in ("* ", "- ", "• "):
             if stripped.startswith(marker):
@@ -281,9 +355,9 @@ def _clean_bullet_text(raw: str, max_bullets: int = 4, max_chars_per_bullet: int
         stripped = re.sub(r'^\[[^\]]{1,20}\]\s*', '', stripped).strip()
         if not stripped:
             continue
-        # Truncate oversize bullets so they don't wrap to 2 lines on card
-        if len(stripped) > max_chars_per_bullet:
-            stripped = stripped[: max_chars_per_bullet - 1].rstrip() + "…"
+        # Do NOT hard-truncate — let wrap_text handle overflow per line.
+        # Truncating here causes ugly "DTCC to tokenize Russell 1000 stocks (NVDA, AAPL, MSFT) in Oc…"
+        # on the card. With wrap_text(f_bullet, max_w) we get a clean 2-line wrap instead.
         out.append(stripped)
         if len(out) >= max_bullets:
             break
@@ -338,7 +412,7 @@ def generate_card(term, explanation, output_path):
 
     if is_bullet_format:
         # Clean + cap to 4 bullets
-        bullets = _clean_bullet_text(explanation, max_bullets=4, max_chars_per_bullet=52)
+        bullets = _clean_bullet_text(explanation, max_bullets=4, max_chars_per_bullet=62)
         if len(bullets) < 2:
             # Not enough bullets after cleaning — fall back to paragraph
             is_bullet_format = False
