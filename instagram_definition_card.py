@@ -78,12 +78,19 @@ def block_height(lines, font, draw, ls=1.4):
     return total
 
 
-def draw_block(draw, lines, font, color, y0, ls=1.4):
+def draw_block(draw, lines, font, color, y0, ls=1.4, left_align=False):
+    """
+    Draw text block. By default centers; set left_align=True for left-aligned text.
+    """
     y = y0
+    left_margin = 100 if left_align else (W - 0) // 2  # default centered
     for line in lines:
         bb = draw.textbbox((0, 0), line, font=font)
         lw, lh = bb[2] - bb[0], bb[3] - bb[1]
-        draw.text(((W - lw) // 2, y), line, fill=color, font=font)
+        if left_align:
+            draw.text((left_margin, y), line, fill=color, font=font)
+        else:
+            draw.text(((W - lw) // 2, y), line, fill=color, font=font)
         y += int(lh * ls)
     return y
 
@@ -345,11 +352,14 @@ def _clean_bullet_text(raw: str, max_bullets: int = 4, max_chars_per_bullet: int
             continue
         # Strip the URL wrapping defensively
         stripped = re.sub(r"\[Link\]\([^)]+\)", "", stripped).strip()
-        # Strip leading markdown bullet markers
+        # Strip leading markdown bullet markers and REPLACE with "- "
         for marker in ("* ", "- ", "• "):
             if stripped.startswith(marker):
                 stripped = stripped[len(marker):]
                 break
+        # Normalize to dash bullet for card (cleaner look)
+        if stripped:
+            stripped = f"- {stripped}"
         # Strip [Source] prefix — saves 3-10 chars per bullet & cleaner card
         # Match patterns: "[X] ", "[CoinDesk] ", "[CoinGecko] ", "[Cointelegraph] " etc.
         stripped = re.sub(r'^\[[^\]]{1,20}\]\s*', '', stripped).strip()
@@ -490,10 +500,10 @@ def generate_card(term, explanation, output_path):
     draw.line([((W - sep_w) // 2, sep_y), ((W + sep_w) // 2, sep_y)],
               fill=BLUE, width=2)
 
-    # Explanation (white) — auto-sized font
+    # Explanation (white) — left-aligned, auto-sized font
     line_spacing = 1.2 if is_bullet_format else 1.4
     draw_block(draw, best_expl_lines, best_f_bullet if is_bullet_format else best_f_body,
-               TEXT_WHITE, sep_y + 32, line_spacing)
+               TEXT_WHITE, sep_y + 32, line_spacing, left_align=True)
 
     img.save(output_path, "PNG")
     return output_path
