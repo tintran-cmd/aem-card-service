@@ -453,7 +453,7 @@ def generate_card(term, explanation, output_path):
                     if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•", "BTC", "ETH", "SOL", "X", "Coin", "White", "Toyota", "Meta", "Kraken", "Trump", "SEC", "CFTC", "Bitcoin", "Ethereum", "Token", "ETF", "Tether", "US", "Bank", "Gold", "Oil", "Japan", "China", "Europe", "Asia")):
                         spaced.append("")
             expl_lines = spaced
-            eh = block_height(expl_lines, f_b, draw, 1.2)
+            eh = block_height(expl_lines, f_b, draw, 1.45)
         else:
             expl_lines = wrap_text(explanation, f_bd, max_w, draw)
             eh = block_height(expl_lines, f_bd, draw, 1.4)
@@ -483,7 +483,7 @@ def generate_card(term, explanation, output_path):
                     if any(wrapped_lines[i + 1].lstrip().startswith(m) for m in ("*", "-", "•", "BTC", "ETH", "SOL", "X", "Coin", "White", "Toyota", "Meta", "Kraken", "Trump", "SEC", "CFTC", "Bitcoin", "Ethereum", "Token", "ETF", "Tether", "US", "Bank", "Gold", "Oil", "Japan", "China", "Europe", "Asia")):
                         spaced.append("")
             best_expl_lines = spaced
-            best_eh = block_height(best_expl_lines, best_f_bullet, draw, 1.2)
+            best_eh = block_height(best_expl_lines, best_f_bullet, draw, 1.45)
         else:
             best_expl_lines = wrap_text(explanation, best_f_body, max_w, draw)
             best_eh = block_height(best_expl_lines, best_f_body, draw, 1.4)
@@ -501,7 +501,7 @@ def generate_card(term, explanation, output_path):
               fill=BLUE, width=2)
 
     # Explanation (white) — left-aligned, auto-sized font
-    line_spacing = 1.2 if is_bullet_format else 1.4
+    line_spacing = 1.45 if is_bullet_format else 1.5
     draw_block(draw, best_expl_lines, best_f_bullet if is_bullet_format else best_f_body,
                TEXT_WHITE, sep_y + 32, line_spacing, left_align=True)
 
