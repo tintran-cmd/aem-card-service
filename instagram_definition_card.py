@@ -95,6 +95,29 @@ def draw_block(draw, lines, font, color, y0, ls=1.4, left_align=False):
     return y
 
 
+def draw_bullet_block(draw, lines, font, color, y0, bullet_start_indices, normal_ls=1.4, extra_gap=18, left_align=False):
+    """
+    Draw bullet text block with extra spacing between bullet groups.
+    bullet_start_indices: list of line indices that are bullet starts (for extra gap after previous line)
+    """
+    y = y0
+    left_margin = 100 if left_align else (W - 0) // 2
+    bullet_starts = set(bullet_start_indices)
+    for i, line in enumerate(lines):
+        bb = draw.textbbox((0, 0), line, font=font)
+        lw, lh = bb[2] - bb[0], bb[3] - bb[1]
+        if left_align:
+            draw.text((left_margin, y), line, fill=color, font=font)
+        else:
+            draw.text(((W - lw) // 2, y), line, fill=color, font=font)
+        # Use extra gap after non-bullet continuation lines that precede bullet starts
+        if i + 1 in bullet_starts and i + 1 < len(lines):
+            y += int(lh * normal_ls) + extra_gap
+        else:
+            y += int(lh * normal_ls)
+    return y
+
+
 def rect(draw, x0, y0, x1, y1, fill, outline=None, width=0):
     if outline:
         draw.rectangle([(x0, y0), (x1, y1)], fill=fill, outline=outline, width=width)
@@ -426,6 +449,17 @@ def generate_card(term, explanation, output_path):
             # Not enough bullets after cleaning — fall back to paragraph
             is_bullet_format = False
 
+    # Track bullet start indices for extra spacing between bullet groups
+    # Build bullet tracking structure
+    bullet_tracking = []  # list of (start_idx, num_wrapped_lines)
+    if is_bullet_format:
+        temp_idx = 0
+        for line in bullets:
+            wl = wrap_text(line, load_font(REGULAR_FONTS, 28), max_w, draw)
+            num_lines = len(wl) if wl else 1
+            bullet_tracking.append((temp_idx, num_lines))
+            temp_idx += num_lines
+
     # Auto-fit: scale font size to make content fit available space
     # Try decreasing font sizes until everything fits
     available_h = content_bottom - content_top - th - 55  # space for term + separator
@@ -434,6 +468,7 @@ def generate_card(term, explanation, output_path):
     best_expl_lines = None
     best_eh = None
     best_size = 0
+    best_bullet_indices = []
 
     for size in [28, 26, 24, 22, 20, 18, 16]:
         f_b  = load_font(REGULAR_FONTS, size)
@@ -442,15 +477,24 @@ def generate_card(term, explanation, output_path):
         if is_bullet_format:
             # Build wrapped lines for bullets (no indent on wrapped continuation)
             wrapped_lines = []
+            bullet_start_indices = []
+            idx = 0
             for line in bullets:
+                bullet_start_indices.append(idx)
                 wl = wrap_text(line, f_b, max_w, draw)
                 wrapped_lines.extend(wl)
+                idx += len(wl) if wl else 1
             # Use consistent line spacing (1.5) for all lines - no empty strings needed
             expl_lines = wrapped_lines
             eh = block_height(expl_lines, f_b, draw, 1.5)
+            # Add extra gap for each bullet start (except first)
+            extra_gap = 18
+            eh += extra_gap * (len(bullet_start_indices) - 1)
+            best_bullet_indices = bullet_start_indices
         else:
             expl_lines = wrap_text(explanation, f_bd, max_w, draw)
             eh = block_height(expl_lines, f_bd, draw, 1.4)
+            best_bullet_indices = []
 
         total_h = th + 55 + eh
         if total_h <= (content_bottom - content_top):
@@ -468,14 +512,22 @@ def generate_card(term, explanation, output_path):
         best_f_body = load_font(BOLD_FONTS, 14)
         if is_bullet_format:
             wrapped_lines = []
+            bullet_start_indices = []
+            idx = 0
             for line in bullets:
-                wrapped_lines.extend(wrap_text(line, best_f_bullet, max_w, draw))
-            # Use consistent line spacing (1.5) for all lines - no empty strings needed
+                bullet_start_indices.append(idx)
+                wl = wrap_text(line, best_f_bullet, max_w, draw)
+                wrapped_lines.extend(wl)
+                idx += len(wl) if wl else 1
             best_expl_lines = wrapped_lines
             best_eh = block_height(best_expl_lines, best_f_bullet, draw, 1.5)
+            extra_gap = 18
+            best_eh += extra_gap * (len(bullet_start_indices) - 1)
+            best_bullet_indices = bullet_start_indices
         else:
             best_expl_lines = wrap_text(explanation, best_f_body, max_w, draw)
             best_eh = block_height(best_expl_lines, best_f_body, draw, 1.4)
+            best_bullet_indices = []
 
     total = th + 55 + best_eh
     start_y = content_top + (content_bottom - content_top - total) // 2
@@ -490,9 +542,17 @@ def generate_card(term, explanation, output_path):
               fill=BLUE, width=2)
 
     # Explanation (white) — left-aligned, auto-sized font
-    line_spacing = 1.5
-    draw_block(draw, best_expl_lines, best_f_bullet if is_bullet_format else best_f_body,
-               TEXT_WHITE, sep_y + 32, line_spacing, left_align=True)
+    if is_bullet_format and best_bullet_indices:
+        # Use bullet block with extra spacing between bullet groups
+        draw_bullet_block(draw, best_expl_lines,
+                         best_f_bullet if is_bullet_format else best_f_body,
+                         TEXT_WHITE, sep_y + 32,
+                         best_bullet_indices, normal_ls=1.4, extra_gap=18,
+                         left_align=True)
+    else:
+        draw_block(draw, best_expl_lines,
+                   best_f_bullet if is_bullet_format else best_f_body,
+                   TEXT_WHITE, sep_y + 32, 1.5, left_align=True)
 
     img.save(output_path, "PNG")
     return output_path
